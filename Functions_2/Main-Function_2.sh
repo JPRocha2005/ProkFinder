@@ -440,8 +440,8 @@ etapa_11() {
     executar_etapa 11 || return 0
     checar_argumentos -f "$J_DIRS_FOLHA_TODAS_ESPECIES" || return 1
     
-    # Uso: desreplicacao_no_dir_taxonomia <tabela_dir_folha> <max_memoria> <num_cpus> <extensao_genoma> <output_tabela_dir_folha_rep> <output_lista_genomas_rep> <programa_filtragem_mge>
-    desreplicacao_genomas "$J_DIRS_FOLHA_TODAS_ESPECIES" "$MEMORIA_RAM" "$NUMERO_CPU" "$F_EXTENSAO_ARQUIVO_GENOMA" "$K_DIRS_FOLHA_REPRESENTATIVOS" "$K_LISTA_GENOMAS_REPRESENTATIVOS" "$K_PROGRAMA_FILTRAGEM_MGE" || return 1
+    # # Uso: desreplicacao_no_dir_taxonomia <tabela_dir_folha> <max_memoria> <num_cpus> <extensao_genoma> <output_tabela_dir_folha_rep> <output_lista_genomas_rep> <programa_filtragem_mge>
+    # desreplicacao_genomas "$J_DIRS_FOLHA_TODAS_ESPECIES" "$MEMORIA_RAM" "$NUMERO_CPU" "$F_EXTENSAO_ARQUIVO_GENOMA" "$K_DIRS_FOLHA_REPRESENTATIVOS" "$K_LISTA_GENOMAS_REPRESENTATIVOS" "$K_PROGRAMA_FILTRAGEM_MGE" || return 1
     
     # Uso: atualizar_tabelas_metadados <lista_genomas:coluna unica:sem HEADER:caminho/acesso do genoma> <dir_metadados_selecionados> <dir_metadados_removidos> <dir_metadados_originais:OPCIONAL>
     atualizar_tabelas_metadados "$K_LISTA_GENOMAS_REPRESENTATIVOS" \

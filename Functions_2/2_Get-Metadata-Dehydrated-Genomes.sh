@@ -1,5 +1,37 @@
 # Funcao para converter os metadados dos genomas de JSON para TSV
 
+###### VARIAVEIS GLOBAIS DE METADADOS ##########
+
+# IMPORTANTE: os tres vetores abaixo devem manter a MESMA ORDEM entre si
+# (o item i de um corresponde ao item i dos outros dois)
+
+VETOR_NOMES_CAMPOS=(
+    "ASSEMBLY"
+    "SAMPLE"
+    "GENERAL"
+    "QUALITY"
+)
+
+VETOR_OUTPUT_METADADOS=(
+    "ASSEMBLY-METADATA.tsv"
+    "SAMPLE-METADATA.tsv"
+    "GENERAL-METADATA.tsv"
+    "QUALITY-METADATA.tsv"
+)
+
+VETOR_CAMPOS=(
+	"accession,assminfo-notes,assminfo-type,assminfo-assembly-method,assminfo-level,assminfo-paired-assm-refseq-genbank-are-different,assminfo-release-date,assminfo-sequencing-tech"
+
+	"accession,assminfo-biosample-accession,assminfo-biosample-collection-date,assminfo-biosample-cultivar,assminfo-biosample-description-organism-infraspecific-cultivar,assminfo-biosample-description-organism-infraspecific-ecotype,assminfo-biosample-description-organism-infraspecific-isolate,assminfo-biosample-description-organism-infraspecific-sex,assminfo-biosample-description-organism-infraspecific-strain,assminfo-biosample-ecotype,assminfo-biosample-geo-loc-name,assminfo-biosample-host,assminfo-biosample-host-disease,assminfo-biosample-ifsac-category,assminfo-biosample-isolate,assminfo-biosample-isolation-source,assminfo-biosample-lat-lon,assminfo-biosample-models,assminfo-biosample-project-name,assminfo-biosample-publication-date,assminfo-biosample-sample-name,assminfo-biosample-source-type,assminfo-biosample-strain,assminfo-biosample-sub-species,assminfo-biosample-submission-date"
+	
+	"accession,organism-tax-id,assminfo-biosample-isolation-source"
+	
+	"accession,assmstats-atgc-count,assmstats-contig-l50,assmstats-contig-n50,assmstats-gaps-between-scaffolds-count,assmstats-gc-percent,assmstats-genome-coverage,assmstats-number-of-component-sequences,assmstats-number-of-contigs,assmstats-number-of-scaffolds,assmstats-scaffold-l50,assmstats-scaffold-n50,assmstats-total-sequence-len,assmstats-total-ungapped-len,checkm-completeness,checkm-contamination"
+)
+
+# Funcao para converter os metadados dos genomas de JSON para TSV
+# (ja aplicando a formatacao de valores nulos/ausentes)
+
 # Uso: gerar_tabelas_metadados_tsv <metadados_json> <dir_output_metadados> <prefixo_genoma>
 gerar_tabelas_metadados_tsv () {
 	local METADADOS_JSON="${1?}"
@@ -8,25 +40,6 @@ gerar_tabelas_metadados_tsv () {
 	
 	# Gerar diretorio de metadados e limpar antigos
 	limpar_diretorio "$DIR_OUTPUT_METADADOS"
-	
-	# Criando as variaveis com os campos de metadados
-    local ASSEMBLY_METADATA_FIELDS="accession,assminfo-notes,assminfo-type,assminfo-assembly-method,assminfo-level,assminfo-paired-assm-refseq-genbank-are-different,assminfo-release-date,assminfo-sequencing-tech"
-    local SAMPLE_METADATA_FIELDS="accession,assminfo-biosample-accession,assminfo-biosample-collection-date,assminfo-biosample-cultivar,assminfo-biosample-description-organism-infraspecific-cultivar,assminfo-biosample-description-organism-infraspecific-ecotype,assminfo-biosample-description-organism-infraspecific-isolate,assminfo-biosample-description-organism-infraspecific-sex,assminfo-biosample-description-organism-infraspecific-strain,assminfo-biosample-ecotype,assminfo-biosample-geo-loc-name,assminfo-biosample-host,assminfo-biosample-host-disease,assminfo-biosample-ifsac-category,assminfo-biosample-isolate,assminfo-biosample-isolation-source,assminfo-biosample-lat-lon,assminfo-biosample-models,assminfo-biosample-project-name,assminfo-biosample-publication-date,assminfo-biosample-sample-name,assminfo-biosample-source-type,assminfo-biosample-strain,assminfo-biosample-sub-species,assminfo-biosample-submission-date"
-    local GENERAL_METADATA_FIELDS="accession,organism-tax-id,assminfo-biosample-isolation-source"
-    local QUALITY_METADATA_FIELDS="accession,assmstats-atgc-count,assmstats-contig-l50,assmstats-contig-n50,assmstats-gaps-between-scaffolds-count,assmstats-gc-percent,assmstats-genome-coverage,assmstats-number-of-component-sequences,assmstats-number-of-contigs,assmstats-number-of-scaffolds,assmstats-scaffold-l50,assmstats-scaffold-n50,assmstats-total-sequence-len,assmstats-total-ungapped-len,checkm-completeness,checkm-contamination"
-
-	# IMPORTANTE: os dois vetores abaixo devem manter a MESMA ORDEM entre si
-	# (o item i de um corresponde ao item i do outro)
-	local VETOR_ARQ_METADADOS=( 
-    "ASSEMBLY-METADATA.tsv" 
-    "SAMPLE-METADATA.tsv" 
-    "GENERAL-METADATA.tsv" 
-    "QUALITY-METADATA.tsv" )
-    local VETOR_CAMPOS_METADADOS=( 
-    "$ASSEMBLY_METADATA_FIELDS" 
-    "$SAMPLE_METADATA_FIELDS" 
-    "$GENERAL_METADATA_FIELDS" 
-    "$QUALITY_METADATA_FIELDS" )
     
     # Checar arquivos de metadados JSON
     if [[ ! -f "$METADADOS_JSON" || ! -s "$METADADOS_JSON"  ]]; then
@@ -38,22 +51,51 @@ gerar_tabelas_metadados_tsv () {
 		echo "[ERRO] Diretorio de metadados '$DIR_OUTPUT_METADADOS' invalido" >> "$LOG_FILE"
 		return 1
 	fi
+
+	# Checar consistencia dos vetores globais (mesmo tamanho)
+	if [[ "${#VETOR_CAMPOS[@]}" -ne "${#VETOR_OUTPUT_METADADOS[@]}" || "${#VETOR_CAMPOS[@]}" -ne "${#VETOR_NOMES_CAMPOS[@]}" ]]; then
+		echo "[ERRO] Vetores globais de metadados com tamanhos diferentes (VETOR_CAMPOS=${#VETOR_CAMPOS[@]}, VETOR_OUTPUT_METADADOS=${#VETOR_OUTPUT_METADADOS[@]}, VETOR_NOMES_CAMPOS=${#VETOR_NOMES_CAMPOS[@]})" >> "$LOG_FILE"
+		return 1
+	fi
     
-    # Convertendo os metadados dos campos selecionados para os respectivos arquivos
-    for ((i=0; i<4; i++)); do
+    # Convertendo os metadados dos campos selecionados para os respectivos arquivos,
+	# ja aplicando a formatacao de valores nulos/ausentes
+	local num_tabelas_metadados="${#VETOR_CAMPOS[@]}"
+    for ((i=0; i<"$num_tabelas_metadados"; i++)); do
+        local METADADOS_TEMP_BRUTO
+        METADADOS_TEMP_BRUTO=$(mktemp)
+
         dataformat tsv genome \
         --inputfile "$METADADOS_JSON" \
-        --fields "${VETOR_CAMPOS_METADADOS[i]}" \
-        > "${DIR_OUTPUT_METADADOS}/${VETOR_ARQ_METADADOS[i]}" \
-			|| { echo "[ERRO] Comando dataformat falhou para '${VETOR_ARQ_METADADOS[i]}'!" >> "$LOG_FILE" ; return 1 ; }
+        --fields "${VETOR_CAMPOS[i]}" \
+        > "$METADADOS_TEMP_BRUTO" \
+			|| { echo "[ERRO] Comando dataformat falhou para '${VETOR_OUTPUT_METADADOS[i]}'!" >> "$LOG_FILE" ; rm -f "$METADADOS_TEMP_BRUTO" ; return 1 ; }
+
+		formatar_tabelas_metadados "$METADADOS_TEMP_BRUTO" \
+			"${DIR_OUTPUT_METADADOS}/${VETOR_OUTPUT_METADADOS[i]}" \
+			"$PREFIXO_GENOMA" \
+			|| { echo "[ERRO] Funcao formatar_tabelas_metadados falhou para '${VETOR_OUTPUT_METADADOS[i]}'!" >> "$LOG_FILE" ; rm -f "$METADADOS_TEMP_BRUTO" ; return 1 ; }
+
+		rm -f "$METADADOS_TEMP_BRUTO"
 	done
 	
-	# Convertendo todos os campos de metadados para arquivo completo (sem flag --fields)
+	# Convertendo todos os campos de metadados para arquivo completo (sem flag --fields),
+	# tambem formatado
 	local COMPLETE_METADATA="ALL-METADATA.tsv"
+	local METADADOS_TEMP_BRUTO_COMPLETO
+	METADADOS_TEMP_BRUTO_COMPLETO=$(mktemp)
+
 	dataformat tsv genome \
         --inputfile "$METADADOS_JSON" \
-        > "${DIR_OUTPUT_METADADOS}/${COMPLETE_METADATA}" \
-			|| { echo "[ERRO] Comando dataformat falhou!" >> "$LOG_FILE" ; return 1 ; }
+        > "$METADADOS_TEMP_BRUTO_COMPLETO" \
+			|| { echo "[ERRO] Comando dataformat falhou!" >> "$LOG_FILE" ; rm -f "$METADADOS_TEMP_BRUTO_COMPLETO" ; return 1 ; }
+
+	formatar_tabelas_metadados "$METADADOS_TEMP_BRUTO_COMPLETO" \
+		"${DIR_OUTPUT_METADADOS}/${COMPLETE_METADATA}" \
+		"$PREFIXO_GENOMA" \
+		|| { echo "[ERRO] Funcao formatar_tabelas_metadados falhou para '${COMPLETE_METADATA}'!" >> "$LOG_FILE" ; rm -f "$METADADOS_TEMP_BRUTO_COMPLETO" ; return 1 ; }
+
+	rm -f "$METADADOS_TEMP_BRUTO_COMPLETO"
 }
 
 # Funcao para substituir valores nulos/ausentes por "NULL" nas tabelas de metadados

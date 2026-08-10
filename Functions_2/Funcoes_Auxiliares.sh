@@ -44,12 +44,16 @@ atualizar_tabelas_metadados () {
 
     # 2. Loop pelas 4 tabelas de metadados
 	local num_tabelas_metadados="${#VETOR_CAMPOS[@]}"
+	if [[ "$num_tabelas_metadados" == 0 || -z "$num_tabelas_metadados" ]]; then
+		echo "[ERRO] Vetor com os metadados $VETOR_CAMPOS nao encontrado!" >> "$LOG_FILE"
+		return 1
+	fi
     for ((i=0; i<"$num_tabelas_metadados"; i++)); do
         local ARQUIVO_METADADOS="${DIR_METADADOS_SELECIONADOS}/${VETOR_OUTPUT_METADADOS[i]}"
         local ARQUIVO_INDESEJADOS="${DIR_METADADOS_INDESEJADOS}/${VETOR_OUTPUT_METADADOS[i]}"
         local NOME_CAMPO="${VETOR_NOMES_CAMPOS[i]}"
 		
-		# Verificar arquivos e diretorios
+	# Verificar arquivos e diretorios
         if [[ ! -f "$ARQUIVO_METADADOS" ]]; then
             echo "[ERRO] Arquivo de metadados ${NOME_CAMPO} nao encontrado: ${ARQUIVO_METADADOS}" >> "$LOG_FILE"
             rm -f "$LISTA_ID_GENOMAS"
@@ -89,7 +93,7 @@ atualizar_tabelas_metadados () {
     # 5. Remover arquivo temporario de IDs
     rm -f "$LISTA_ID_GENOMAS"
 	
-	echo "[INFO] Atualizacao dos metadados completa!" >> "$LOG_FILE"
+	echo "[INFO] Atualizacao dos metadados no diretorio $DIR_METADADOS_SELECIONADOS completa!" >> "$LOG_FILE"
 }
 
 
@@ -141,4 +145,6 @@ atualizar_pasta_genomas () {
 
 	# Limpeza dos arquivos temporarios
 	rm -f "$LISTA_ID_GENOMAS" "$ARQ_GENOMAS_REMOVER"
+	
+		echo "[INFO] Atualizacao dos genomas no diretorio $PASTA_GENOMAS completa!" >> "$LOG_FILE"
 }

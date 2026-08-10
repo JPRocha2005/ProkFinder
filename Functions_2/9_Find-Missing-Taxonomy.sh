@@ -64,61 +64,6 @@ submeter_e_aguardar() {
     fi
 }
 
-
-# Funcao para mesclar um arquivo de summary especifico (bac120 ou ar53) gerado em cada lote do gtdbtk
-# em um unico arquivo consolidado, mantendo apenas um cabecalho no arquivo final
-
-# Chamando a funcao
-# mesclar_arquivo_summary_lotes <dir_resultados_classificacao> <nome_arquivo_summary> <arquivo_summary_mesclado>
-mesclar_arquivo_summary_lotes () {
-	local DIR_RESULTADOS_CLASSIFICAO="${1?}"
-	local NOME_ARQUIVO_SUMMARY="${2?}"
-	local ARQUIVO_SUMMARY_MESCLADO="${3?}"
-
-	# Encontrando todos os arquivos de summary com esse nome dentro dos subdiretorios de lote (lote_000, lote_001...)
-	# 2>/dev/null para nao gerar erro caso nenhum lote tenha gerado esse arquivo (ex: dataset sem arqueias)
-	local ARQUIVOS_SUMMARY_LOTES=$(find "$DIR_RESULTADOS_CLASSIFICAO" -mindepth 2 -maxdepth 2 -type f -name "$NOME_ARQUIVO_SUMMARY" 2>/dev/null | sort)
-
-	# Se nenhum lote gerou esse arquivo, nao ha nada para mesclar (ex: dataset sem genomas do dominio Archaea)
-	if [ -z "$ARQUIVOS_SUMMARY_LOTES" ]; then
-		echo "[INFO] Nenhum arquivo $NOME_ARQUIVO_SUMMARY encontrado nos lotes. Etapa de mesclagem ignorada para esse arquivo." >> "$LOG_FILE"
-		return 0
-	fi
-
-	# Pegando o cabecalho apenas do primeiro arquivo encontrado
-	local PRIMEIRO_ARQUIVO=$(echo "$ARQUIVOS_SUMMARY_LOTES" | head -n 1)
-	head -n 1 "$PRIMEIRO_ARQUIVO" > "$ARQUIVO_SUMMARY_MESCLADO"
-
-	# Concatenando as linhas de dados (sem o cabecalho) de cada arquivo de summary encontrado
-	local ARQUIVO_ATUAL
-	for ARQUIVO_ATUAL in $ARQUIVOS_SUMMARY_LOTES; do
-		tail -n +2 "$ARQUIVO_ATUAL" >> "$ARQUIVO_SUMMARY_MESCLADO"
-	done
-
-	echo "Arquivo $NOME_ARQUIVO_SUMMARY mesclado de $(echo "$ARQUIVOS_SUMMARY_LOTES" | wc -l) lote(s) e salvo em: $ARQUIVO_SUMMARY_MESCLADO" >> "$LOG_FILE"
-}
-
-# Funcao para mesclar os resultados de classificacao taxonomica (gtdbtk.bac120.summary.tsv e gtdbtk.ar53.summary.tsv)
-# de todos os lotes processados pelo gtdbtk classify_wf em arquivos unicos e consolidados
-
-# Chamando a funcao
-# mesclar_resultados_gtdbtk_lotes <dir_resultados_classificacao>
-mesclar_resultados_gtdbtk_lotes () {
-	local DIR_RESULTADOS_CLASSIFICAO="${1?}"
-
-	# Mesclando o summary de bacterias (caso exista em algum lote)
-	mesclar_arquivo_summary_lotes \
-	"$DIR_RESULTADOS_CLASSIFICAO" \
-	"gtdbtk.bac120.summary.tsv" \
-	"$DIR_RESULTADOS_CLASSIFICAO/gtdbtk.bac120.summary.tsv"
-
-	# Mesclando o summary de arqueias (caso exista em algum lote)
-	mesclar_arquivo_summary_lotes \
-	"$DIR_RESULTADOS_CLASSIFICAO" \
-	"gtdbtk.ar53.summary.tsv" \
-	"$DIR_RESULTADOS_CLASSIFICAO/gtdbtk.ar53.summary.tsv"
-}
-
 # Funcao para classificar os genomas que nao tem uma taxonomia definida no GTDB utilizando o programa GTDB-TK (GTDB Toolkit)
 
 # Chamando a funcao
@@ -128,9 +73,9 @@ classify_genomes () {
 	local EXTENSAO_GENOMAS="${2?}"
 	local NUMERO_CPUS="${3?}"
 	local PPLACER_NUMERO_CPUS="${4?}" # metade das cpus
-	local DIR_RESULTADOS_CLASSIFICAO="${5?}"
+	local DIR_RESULTADOS_CLASSIFICACAO="${5?}"
 	
-	limpar_diretorio "$DIR_RESULTADOS_CLASSIFICAO"
+	limpar_diretorio "$DIR_RESULTADOS_CLASSIFICACAO"
 		
 	# Funcionamento do gtdbtk classify_wf:
 	# Le o arquivo dos genomas, faz o calculo do ANI, a identificacao dos genes marcadores, o alinhamento multiplo com outros marcadores do GTDB e, a partir desse MSA, ele posiciona o genoma na arvore filogenetica ja previamente montada (na variavel ambiente: GTDBTK_DATA_PATH). Ou seja, o comando classify_wf nao constroi a arvore do zero, mas sim o posicionamento filogenétio do genoma para encontrar sua taxonomia
@@ -150,22 +95,22 @@ classify_genomes () {
 	# Em datasets muito grandes (5000+ genomas), a etapa de calculo de ANI com skani do gtdbtk classify_wf
 	# pode falhar sem uma causa clara (skani returned a non-zero exit code). Para contornar isso, a lista de
 	# genomas nao classificados e dividida em lotes menores, e cada lote e classificado separadamente,
-	# em um subdiretorio proprio dentro de $DIR_RESULTADOS_CLASSIFICAO.
+	# em um subdiretorio proprio dentro de $DIR_RESULTADOS_CLASSIFICACAO.
 	local TAMANHO_LOTE=500
 
 	# Diretorio temporario para guardar os arquivos de cada lote (um arquivo por lote, com os IDs dos genomas)
-	local DIR_LOTES_TEMP=$(mktemp -d)
+	local DIR_ID_LOTES_TEMP=$(mktemp -d)
 
 	# Dividindo a lista de genomas nao classificados em arquivos de no maximo $TAMANHO_LOTE linhas cada
 	# prefixo "lote_" + sufixo numerico (000, 001, 002...)
-	split -l "$TAMANHO_LOTE" -d -a 3 "$LISTA_GENOMAS_NAO_CLASSIFICADOS" "$DIR_LOTES_TEMP/lote_"
+	split -l "$TAMANHO_LOTE" -d -a 3 "$LISTA_GENOMAS_NAO_CLASSIFICADOS" "$DIR_ID_LOTES_TEMP/lote_"
 
 	# Iterando sobre cada lote gerado e rodando o gtdbtk separadamente para cada um
 	local ARQUIVO_LOTE
-	for ARQUIVO_LOTE in "$DIR_LOTES_TEMP"/lote_*; do
+	for ARQUIVO_LOTE in "$DIR_ID_LOTES_TEMP"/lote_*; do
 
 		local NOME_LOTE=$(basename "$ARQUIVO_LOTE")
-		local DIR_RESULTADOS_LOTE="$DIR_RESULTADOS_CLASSIFICAO/$NOME_LOTE"
+		local DIR_RESULTADOS_LOTE="$DIR_RESULTADOS_CLASSIFICACAO/$NOME_LOTE"
 
 		# Criando tabela de genomas do lote com caminho na 1° coluna e ID na 2° coluna
 		local CAMINHOS_GENOMAS_TEMP=$(mktemp)
@@ -189,19 +134,61 @@ classify_genomes () {
 		else
 			echo "[ERRO] O gtdbtk falhou no $NOME_LOTE! Nao foi possivel obter a classificacao taxonomica." >> "$LOG_FILE"
 			rm -f "$CAMINHOS_GENOMAS_TEMP" "$TABELA_GENOMAS_TEMP"
-			rm -rf "$DIR_LOTES_TEMP"
+			rm -rf "$DIR_ID_LOTES_TEMP"
 			return 1
 		fi
 
 		# Removendo arquivos temporarios do lote
 		rm -f "$CAMINHOS_GENOMAS_TEMP" "$TABELA_GENOMAS_TEMP"
 	done
-
-	# Removendo diretorio temporario dos lotes
-	rm -rf "$DIR_LOTES_TEMP"
-
+	
 	# Mesclando os arquivos de summary (bac120 e ar53) de todos os lotes em arquivos unicos
-	mesclar_resultados_gtdbtk_lotes "$DIR_RESULTADOS_CLASSIFICAO"
+	mesclar_resultados_gtdbtk_lotes "$DIR_RESULTADOS_CLASSIFICACAO"
+
+	# Removendo diretorio temporario dos lotes (nao é o dir com os resultados - 
+	rm -rf "$DIR_ID_LOTES_TEMP"
+}
+
+# Funcao para mesclar os resultados de classificacao taxonomica (gtdbtk.bac120.summary.tsv e gtdbtk.ar53.summary.tsv)
+# de todos os lotes processados pelo gtdbtk classify_wf em arquivos unicos e consolidados
+
+# mesclar_resultados_gtdbtk_lotes <dir_resultados_classificacao>
+mesclar_resultados_gtdbtk_lotes () {
+	local DIR_LOTES="${1%/}"
+	local RESULTADOS_CLASSIFICACAO="classify"
+	local ARQ_BACTERIA="gtdbtk.bac120.summary.tsv"
+	local ARQ_ARQUEIA="gtdbtk.ar53.summary.tsv"
+	local DIR_SAIDA_MESCLADA="${DIR_LOTES}/${RESULTADOS_CLASSIFICACAO}"
+	local encontrou_algo=0
+	local ARQ_HEADER_REF
+
+	# Para arqueias: procura o primeiro lote (qualquer um) que tenha o arquivo, para pegar o header
+	ARQ_HEADER_REF=$(find "${DIR_LOTES}" -type f -wholename "${DIR_LOTES}/lote_*/${RESULTADOS_CLASSIFICACAO}/${ARQ_ARQUEIA}" -print -quit)
+	if [ -n "$ARQ_HEADER_REF" ]; then
+		mkdir -p "$DIR_SAIDA_MESCLADA"
+		head -n1 "$ARQ_HEADER_REF" > "${DIR_SAIDA_MESCLADA}/${ARQ_ARQUEIA}"
+
+		find "${DIR_LOTES}" -type f -wholename "${DIR_LOTES}/lote_*/${RESULTADOS_CLASSIFICACAO}/${ARQ_ARQUEIA}" \
+		-exec awk -F'\t' 'FNR > 1' {} + >> "${DIR_SAIDA_MESCLADA}/${ARQ_ARQUEIA}"
+		encontrou_algo=1
+	fi
+
+	# Para bacterias: mesma logica, independente do resultado das arqueias
+	ARQ_HEADER_REF=$(find "${DIR_LOTES}" -type f -wholename "${DIR_LOTES}/lote_*/${RESULTADOS_CLASSIFICACAO}/${ARQ_BACTERIA}" -print -quit)
+	if [ -n "$ARQ_HEADER_REF" ]; then
+		mkdir -p "$DIR_SAIDA_MESCLADA"
+		head -n1 "$ARQ_HEADER_REF" > "${DIR_SAIDA_MESCLADA}/${ARQ_BACTERIA}"
+
+		find "${DIR_LOTES}" -type f -wholename "${DIR_LOTES}/lote_*/${RESULTADOS_CLASSIFICACAO}/${ARQ_BACTERIA}" \
+		-exec awk -F'\t' 'FNR > 1' {} + >> "${DIR_SAIDA_MESCLADA}/${ARQ_BACTERIA}"
+		encontrou_algo=1
+	fi
+
+	if [ "$encontrou_algo" -eq 0 ]; then
+		echo "[ERRO] No dir: ${DIR_LOTES}/lote_*/${RESULTADOS_CLASSIFICACAO}/" >> "$LOG_FILE"
+		echo "[ERRO] Nenhum arquivo de classificacao ($ARQ_ARQUEIA ou $ARQ_BACTERIA) encontrado" >> "$LOG_FILE"
+		return 1
+	fi
 }
 
 # Funcao para atualizar o arquivo de taxonomia
@@ -228,15 +215,13 @@ update_taxonomy_file () {
 	
 	# 1. Checar se o dir do gtdbtk existe
 	if [ -n "$DIR_GTDBTK_TAX_RESULTS" ] && [ -d "$DIR_GTDBTK_TAX_RESULTS" ]; then
-		# Se existir, concatenar as linhas da classificao
+		# Se existir, concatenar as linhas da CLASSIFICACAO
 		echo "[INFO] Adicionando as classificacoes taxonomicas do GTDB-TK" >> "$LOG_FILE"
 		add_gtdbtk_taxonomy_table "$OUTPUT_NEW_TAXONOMY_FILE" "$DIR_GTDBTK_TAX_RESULTS"
 	else
 		# Se nao existir, apenas prosseguir com a funcao
 		echo "[INFO] Classificacao taxonomica completa! Nao foi necessario buscar taxonomia com GTDB-TK" >> "$LOG_FILE"
 	fi
-
-
 }
 
 add_gtdbtk_taxonomy_table () {
