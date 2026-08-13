@@ -1,2 +1,5 @@
 # Ignorar pasta de LIXO
 Function_2/LIXO/
+scripts/ncbi_dataset/
+scripts/ncbi_dataset.zip
+scripts/Modules/Miniforge3-Linux-x86_64.sh
